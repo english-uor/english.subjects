@@ -72,8 +72,6 @@
             <h2 class="text-xl font-black text-slate-800" x-text="t('loginTitle')"></h2>
             
             <div class="text-left rtl:text-right space-y-4">
-              
-
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2" x-text="t('teachingScopeLabel')"></label>
                 <select x-model="teachingScope" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm md:text-base outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700">
@@ -99,19 +97,6 @@
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-lg font-bold text-slate-800"><span x-text="t('greeting')"></span> <span class="text-blue-600" x-text="selectedTeacherName"></span></h2>
             <button @click="teacherSignOut()" class="text-xs bg-slate-200 text-slate-600 hover:bg-rose-100 hover:text-rose-600 px-3 py-1.5 rounded-lg font-bold transition">🚪 <span x-text="t('btnSignOut')"></span></button>
-          </div>
-
-          <div x-show="selectedCartIds.length > 0 && !isDashboardLocked" x-transition>
-            <button @click="wizardStep = 3" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-3xl flex items-center justify-between shadow-lg shadow-emerald-600/20 transition active:scale-[0.98] border-2 border-emerald-500">
-              <div class="flex items-center gap-4">
-                <div class="text-xl bg-white text-emerald-700 w-12 h-12 flex items-center justify-center rounded-2xl font-black shadow-inner" x-text="selectedCartIds.length"></div>
-                <div class="text-left rtl:text-right">
-                  <h4 class="font-black text-white text-lg" x-text="t('btnReviewSend')"></h4>
-                  <p class="text-emerald-100 text-[11px] font-medium" x-text="t('clickToFinalize')"></p>
-                </div>
-              </div>
-              <span class="text-white font-bold text-2xl rtl:rotate-180 bg-emerald-700/50 w-10 h-10 flex items-center justify-center rounded-full">❯</span>
-            </button>
           </div>
 
           <div class="space-y-4">
@@ -219,6 +204,19 @@
                    </button>
                 </div>
              </div>
+          </div>
+
+          <div x-show="selectedCartIds.length > 0 && !isDashboardLocked" x-transition class="mt-6">
+            <button @click="wizardStep = 3" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-3xl flex items-center justify-between shadow-lg shadow-emerald-600/20 transition active:scale-[0.98] border-2 border-emerald-500">
+              <div class="flex items-center gap-4">
+                <div class="text-xl bg-white text-emerald-700 w-12 h-12 flex items-center justify-center rounded-2xl font-black shadow-inner" x-text="selectedCartIds.length"></div>
+                <div class="text-left rtl:text-right">
+                  <h4 class="font-black text-white text-lg" x-text="t('btnReviewSend')"></h4>
+                  <p class="text-emerald-100 text-[11px] font-medium" x-text="t('clickToFinalize')"></p>
+                </div>
+              </div>
+              <span class="text-white font-bold text-2xl rtl:rotate-180 bg-emerald-700/50 w-10 h-10 flex items-center justify-center rounded-full">❯</span>
+            </button>
           </div>
           
           <div class="bg-slate-50 px-5 py-4 border border-slate-200 rounded-2xl text-center shadow-inner mt-4" x-show="!isDashboardLocked">
@@ -631,6 +629,12 @@
   </div>
 
   <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwEnrFhPzsGpRkAXrrBmwXB7JNbq1_l87EzeQ3UfxGUw1slP3DiBGVVqrAYdStbXt3c/exec_DEPLOYED_GAS_WEB_APP_URL';
+    async function gasCall(action, ...params) {
+      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action, params }) });
+      return res.json();
+    }
+
     function appSystem() {
       return {
         currentLang: 'ku', currentView: 'teacher', wizardStep: 0, 
@@ -712,34 +716,45 @@
           }
         },
 
-        async gasRun(action, ...args) {
-          const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzUWrfPSMmd_IM5vQU5ttO-JObSu-FRuhzL2qv2HMC9dyVAoJtR2uyoiQPhxw7FH3w7/exec"; // ⚠️ PASTE YOUR DEPLOYED GAS URL HERE
-          const res = await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action, args }) });
-          return await res.json();
-        },
         init() { this.refreshData(); setInterval(() => this.refreshData(), 15000); },
         t(key) { return this.localization[this.currentLang][key] || key; },
         setLanguage(l) { this.currentLang = l; },
         addToast(m, type = 'success') { const id = Date.now(); this.toasts.push({ id, message: m, type }); setTimeout(() => this.removeToast(id), 4000); },
         removeToast(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
-        refreshData() { this.gasRun('getAppData').then((res) => { this.db = res; }); },
+        refreshData() { gasCall('getAppData').then(res => { this.db = res; }); },
         fetchCalculations() {
             this.isLoadingCalc = true;
-            this.gasRun('getCalculations').then(res => {
+            gasCall('getCalculations').then(res => {
                 this.calculationsData = res;
                 this.isLoadingCalc = false;
             });
         },
-        resetVerification() { this.isTeacherVerified = false; this.teacherEnteredCode = ''; this.teachingScope = ''; this.hasSubmitted = false; this.selectedCartIds = []; this.wizardStep = 0; },
+        resetVerification() { 
+          this.isTeacherVerified = false; 
+          this.teacherEnteredCode = ''; 
+          this.teachingScope = ''; 
+          this.hasSubmitted = false; 
+          this.selectedCartIds = []; 
+          this.wizardStep = 0; 
+          this.selectedTeacherName = ''; 
+        },
 
         verifyTeacherIdentity() {
           if (!this.teachingScope) { this.addToast(this.t('errorSelectScope'), "error"); return; }
-          const prof = this.db.teachers.find(t => t.code && t.code.toString().trim() === this.teacherEnteredCode.trim());
+          if (!this.teacherEnteredCode.trim()) { this.addToast(this.currentLang === 'ku' ? "تکایە کۆدەکە بنووسە" : "Please enter your PIN.", "error"); return; }
+          
+          const prof = this.db.teachers.find(t => t.code === this.teacherEnteredCode.trim());
+          
           if (prof) {
-            this.selectedTeacherName = prof.name;
-            this.isTeacherVerified = true; this.teacherTargetHours = prof.targetHours; this.selectedTeacherEmail = prof.email; this.wizardStep = 1;
-            this.addToast("Login Successful ✓", "success");
-          } else { this.addToast("Incorrect credentials!", "error"); }
+            this.selectedTeacherName = prof.name; 
+            this.isTeacherVerified = true; 
+            this.teacherTargetHours = prof.targetHours; 
+            this.selectedTeacherEmail = prof.email; 
+            this.wizardStep = 1;
+            this.addToast(this.currentLang === 'ku' ? "چوونەژوورەوە سەرکەوتوو بوو ✓" : "Login Successful ✓", "success");
+          } else { 
+            this.addToast(this.currentLang === 'ku' ? "کۆدەکە هەڵەیە!" : "Incorrect PIN!", "error"); 
+          }
         },
         teacherSignOut() { this.resetVerification(); this.addToast("Signed out.", "info"); },
         startSelection(semester) { this.form.semester = semester; this.wizardStep = 2; },
@@ -797,8 +812,7 @@
           }
 
           this.subLock = true;
-          this.gasRun('submitBulkSelections', this.selectedTeacherName, this.selectedTeacherEmail, this.selectedCartModules)
-            .then((res) => {
+          gasCall('submitBulkSelections', this.selectedTeacherName, this.selectedTeacherEmail, this.selectedCartModules).then((res) => {
               this.subLock = false;
               if (res.success) {
                 this.addToast("Package Submitted Successfully! Confirmation email sent.", "success");
@@ -812,7 +826,7 @@
 
         // --- NEW ADMIN PANEL LOGIC (Ported from Desktop) ---
         authenticateAdmin() {
-          this.gasRun('verifyAdminPin', this.adminPin).then((isValid) => { 
+          gasCall('verifyAdminPin', this.adminPin).then((isValid) => { 
             if (isValid) { this.isAdminAuthenticated = true; this.addToast("Admin console unlocked."); } 
             else { this.addToast("Incorrect PIN.", "error"); }
           });
@@ -859,7 +873,7 @@
         clearAllTeacherPackages(teacherName) { 
           const confirmTxt = this.currentLang === 'ku' ? `ئایا دڵنیایت لە سڕینەوەی تەواوی تۆمارەکانی مامۆستا ${teacherName}؟` : `Are you absolutely sure you want to completely wipe all registered selections for ${teacherName}?`;
           if (!confirm(confirmTxt)) return;
-          this.gasRun('clearTeacherAssignments', teacherName).then((res) => {
+          gasCall('clearTeacherAssignments', teacherName).then((res) => {
             if(res.success) { this.addToast(this.currentLang === 'ku' ? "تۆمارەکان بە سەرکەوتوویی سڕدرانەوە" : "Registrations completely cleared.", "success"); this.refreshData(); }
             else { this.addToast(res.message, "error"); }
           }); 
@@ -868,7 +882,7 @@
         deleteItem(moduleId) { 
           const confirmTxt = this.currentLang === 'ku' ? "ئایا دڵنیایت لە لادانی ئەم مۆدیۆلە؟" : "Are you sure you want to disassociate and remove this module allocation?";
           if (!confirm(confirmTxt)) return;
-          this.gasRun('deleteSingleAssignment', moduleId).then((res) => {
+          gasCall('deleteSingleAssignment', moduleId).then((res) => {
             if(res.success) { this.addToast(this.currentLang === 'ku' ? "مۆدیۆلەکە لادرا" : "Module allocation deleted.", "success"); this.refreshData(); }
             else { this.addToast(res.message, "error"); }
           }); 
@@ -880,7 +894,7 @@
             return;
           }
           this.addToast(this.currentLang === 'ku' ? "کۆدەکە دەنێردرێت..." : "Sending credentials email...", "info");
-          this.gasRun('sendTeacherCredentialsEmail', teacherObj.name, teacherObj.email, teacherObj.code).then((res) => {
+          gasCall('sendTeacherCredentialsEmail', teacherObj.name, teacherObj.email, teacherObj.code).then((res) => {
             if (res.success) this.addToast(this.currentLang === 'ku' ? `بە سەرکەوتوویی ناردرا بۆ ${teacherObj.name}` : `Credentials sent to ${teacherObj.name}!`, "success");
             else this.addToast(res.message, "error");
           });
