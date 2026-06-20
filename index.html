@@ -629,7 +629,7 @@
   </div>
 
   <script>
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwEnrFhPzsGpRkAXrrBmwXB7JNbq1_l87EzeQ3UfxGUw1slP3DiBGVVqrAYdStbXt3c/exec_DEPLOYED_GAS_WEB_APP_URL';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxJfE8VOY9qlTo-XEXdDOOy_QeycUDEQ5b8RHgHZsDgL79q4LEQ3CcwQAnDAOiqovMJ/exec';
     async function gasCall(action, ...params) {
       const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action, params }) });
       return res.json();
