@@ -72,61 +72,7 @@
             <h2 class="text-xl font-black text-slate-800" x-text="t('loginTitle')"></h2>
             
             <div class="text-left rtl:text-right space-y-4">
-              ```
-
-#### 2. Add API Connection Helper & Update Login Logic
-**FIND:**
-```javascript
-        // Paste your new Google Apps Script Web App URL here between the quotes
-        backendUrl: 'https://script.google.com/macros/s/AKfycbzUWrfPSMmd_IM5vQU5ttO-JObSu-FRuhzL2qv2HMC9dyVAoJtR2uyoiQPhxw7FH3w7/exec',
-
-        async callBackend(action, ...args) {
-            try {
-                const response = await fetch(this.backendUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: action, args: args }),
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Bypasses CORS issues
-                });
-                const result = await response.json();
-                if (!result.success) throw new Error(result.error);
-                return result.data;
-            } catch (err) {
-                this.addToast("Connection Error: " + err.message, "error");
-                throw err;
-            }
-        },
-
-        init() { this.refreshData(); setInterval(() => this.refreshData(), 15000); },
-        t(key) { return this.localization[this.currentLang][key] || key; },
-        setLanguage(l) { this.currentLang = l; },
-        addToast(m, type = 'success') { const id = Date.now(); this.toasts.push({ id, message: m, type }); setTimeout(() => this.removeToast(id), 4000); },
-        removeToast(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
-        
-        refreshData() { this.callBackend('getAppData').then(res => { this.db = res; }).catch(e => console.error(e)); },
-        fetchCalculations() {
-            this.isLoadingCalc = true;
-            this.callBackend('getCalculations').then(res => {
-                this.calculationsData = res;
-                this.isLoadingCalc = false;
-            }).catch(e => { this.isLoadingCalc = false; });
-        },
-        resetVerification() { this.isTeacherVerified = false; this.teacherEnteredCode = ''; this.teachingScope = ''; this.hasSubmitted = false; this.selectedCartIds = []; this.wizardStep = 0; },
-
-        verifyTeacherIdentity() {
-          if (!this.teachingScope) { this.addToast(this.t('errorSelectScope'), "error"); return; }
-          if (!this.teacherEnteredCode.trim()) { this.addToast("Please enter your PIN", "error"); return; }
-          
-          // Now we search directly by the entered Code instead of the selected name
-          const prof = this.db.teachers.find(t => t.code === this.teacherEnteredCode.trim());
-          if (prof) {
-            this.selectedTeacherName = prof.name; // Automatically sets the name behind the scenes
-            this.isTeacherVerified = true; 
-            this.teacherTargetHours = prof.targetHours; 
-            this.selectedTeacherEmail = prof.email; 
-            this.wizardStep = 1;
-            this.addToast("Login Successful ✓", "success");
-          } else { this.addToast("Incorrect PIN!", "error"); }
-        },
+              
 
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2" x-text="t('teachingScopeLabel')"></label>
@@ -766,25 +712,31 @@
           }
         },
 
+        async gasRun(action, ...args) {
+          const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzUWrfPSMmd_IM5vQU5ttO-JObSu-FRuhzL2qv2HMC9dyVAoJtR2uyoiQPhxw7FH3w7/exec"; // ⚠️ PASTE YOUR DEPLOYED GAS URL HERE
+          const res = await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action, args }) });
+          return await res.json();
+        },
         init() { this.refreshData(); setInterval(() => this.refreshData(), 15000); },
         t(key) { return this.localization[this.currentLang][key] || key; },
         setLanguage(l) { this.currentLang = l; },
         addToast(m, type = 'success') { const id = Date.now(); this.toasts.push({ id, message: m, type }); setTimeout(() => this.removeToast(id), 4000); },
         removeToast(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
-        refreshData() { google.script.run.withSuccessHandler((res) => { this.db = res; }).getAppData(); },
+        refreshData() { this.gasRun('getAppData').then((res) => { this.db = res; }); },
         fetchCalculations() {
             this.isLoadingCalc = true;
-            google.script.run.withSuccessHandler(res => {
+            this.gasRun('getCalculations').then(res => {
                 this.calculationsData = res;
                 this.isLoadingCalc = false;
-            }).getCalculations();
+            });
         },
         resetVerification() { this.isTeacherVerified = false; this.teacherEnteredCode = ''; this.teachingScope = ''; this.hasSubmitted = false; this.selectedCartIds = []; this.wizardStep = 0; },
 
         verifyTeacherIdentity() {
           if (!this.teachingScope) { this.addToast(this.t('errorSelectScope'), "error"); return; }
-          const prof = this.db.teachers.find(t => t.name === this.selectedTeacherName);
-          if (prof && prof.code === this.teacherEnteredCode.trim()) {
+          const prof = this.db.teachers.find(t => t.code && t.code.toString().trim() === this.teacherEnteredCode.trim());
+          if (prof) {
+            this.selectedTeacherName = prof.name;
             this.isTeacherVerified = true; this.teacherTargetHours = prof.targetHours; this.selectedTeacherEmail = prof.email; this.wizardStep = 1;
             this.addToast("Login Successful ✓", "success");
           } else { this.addToast("Incorrect credentials!", "error"); }
@@ -845,7 +797,7 @@
           }
 
           this.subLock = true;
-          this.callBackend('submitBulkSelections', this.selectedTeacherName, this.selectedTeacherEmail, this.selectedCartModules)
+          this.gasRun('submitBulkSelections', this.selectedTeacherName, this.selectedTeacherEmail, this.selectedCartModules)
             .then((res) => {
               this.subLock = false;
               if (res.success) {
@@ -855,12 +807,12 @@
                 this.refreshData(); 
                 this.wizardStep = 1;
               } else { this.addToast(res.message, "error"); this.refreshData(); }
-            }).catch(e => { this.subLock = false; });
+            });
         },
 
         // --- NEW ADMIN PANEL LOGIC (Ported from Desktop) ---
         authenticateAdmin() {
-          this.callBackend('verifyAdminPin', this.adminPin).then((isValid) => {
+          this.gasRun('verifyAdminPin', this.adminPin).then((isValid) => { 
             if (isValid) { this.isAdminAuthenticated = true; this.addToast("Admin console unlocked."); } 
             else { this.addToast("Incorrect PIN.", "error"); }
           });
@@ -868,7 +820,6 @@
         adminSignOut() { this.isAdminAuthenticated = false; this.adminPin = ''; this.addToast(this.t('btnSignOut') + " ✓", "info"); },
 
         get adminTeacherMetrics() {
-          // ... (keep your existing adminTeacherMetrics logic exactly as it is)
           return this.db.teachers.map(t => {
             const allTeacherAssigns = this.db.assignments.filter(a => a.teacherName === t.name);
             const filteredAssigns = allTeacherAssigns.filter(a => {
@@ -908,19 +859,19 @@
         clearAllTeacherPackages(teacherName) { 
           const confirmTxt = this.currentLang === 'ku' ? `ئایا دڵنیایت لە سڕینەوەی تەواوی تۆمارەکانی مامۆستا ${teacherName}؟` : `Are you absolutely sure you want to completely wipe all registered selections for ${teacherName}?`;
           if (!confirm(confirmTxt)) return;
-          this.callBackend('clearTeacherAssignments', teacherName).then((res) => {
+          this.gasRun('clearTeacherAssignments', teacherName).then((res) => {
             if(res.success) { this.addToast(this.currentLang === 'ku' ? "تۆمارەکان بە سەرکەوتوویی سڕدرانەوە" : "Registrations completely cleared.", "success"); this.refreshData(); }
             else { this.addToast(res.message, "error"); }
-          });
+          }); 
         },
 
         deleteItem(moduleId) { 
           const confirmTxt = this.currentLang === 'ku' ? "ئایا دڵنیایت لە لادانی ئەم مۆدیۆلە؟" : "Are you sure you want to disassociate and remove this module allocation?";
           if (!confirm(confirmTxt)) return;
-          this.callBackend('deleteSingleAssignment', moduleId).then((res) => {
+          this.gasRun('deleteSingleAssignment', moduleId).then((res) => {
             if(res.success) { this.addToast(this.currentLang === 'ku' ? "مۆدیۆلەکە لادرا" : "Module allocation deleted.", "success"); this.refreshData(); }
             else { this.addToast(res.message, "error"); }
-          });
+          }); 
         },
 
         sendTeacherCredentials(teacherObj) {
@@ -929,82 +880,10 @@
             return;
           }
           this.addToast(this.currentLang === 'ku' ? "کۆدەکە دەنێردرێت..." : "Sending credentials email...", "info");
-          
-          // This dynamically grabs your current GitHub website link
-          const currentUrl = window.location.href.split('?')[0]; 
-          
-          this.callBackend('sendTeacherCredentialsEmail', teacherObj.name, teacherObj.email, teacherObj.code, currentUrl).then((res) => {
+          this.gasRun('sendTeacherCredentialsEmail', teacherObj.name, teacherObj.email, teacherObj.code).then((res) => {
             if (res.success) this.addToast(this.currentLang === 'ku' ? `بە سەرکەوتوویی ناردرا بۆ ${teacherObj.name}` : `Credentials sent to ${teacherObj.name}!`, "success");
             else this.addToast(res.message, "error");
           });
-        },
-        adminSignOut() { this.isAdminAuthenticated = false; this.adminPin = ''; this.addToast(this.t('btnSignOut') + " ✓", "info"); },
-
-        get adminTeacherMetrics() {
-          return this.db.teachers.map(t => {
-            const allTeacherAssigns = this.db.assignments.filter(a => a.teacherName === t.name);
-            const filteredAssigns = allTeacherAssigns.filter(a => {
-              const matchShift = this.adminFilters.shift === 'All' || a.shift === this.adminFilters.shift;
-              const matchSem = this.adminFilters.semester === 'All' || a.semester === this.adminFilters.semester;
-              const matchYr = this.adminFilters.year === 'All' || a.year === this.adminFilters.year;
-              return matchShift && matchSem && matchYr;
-            });
-            const filteredTotalHours = filteredAssigns.reduce((sum, a) => sum + a.hours, 0);
-            const globalTotalHours = allTeacherAssigns.reduce((sum, a) => sum + a.hours, 0);
-            return {
-              name: t.name, email: t.email, code: t.code, targetHours: t.targetHours,
-              filteredTotalHours: filteredTotalHours, globalTotalHours: globalTotalHours,
-              matchedModules: filteredAssigns, hasSelections: allTeacherAssigns.length > 0,
-              hasReachedTarget: globalTotalHours >= t.targetHours
-            };
-          });
-        },
-
-        get sortedRegisteredTeachers() {
-          return this.adminTeacherMetrics.filter(t => t.hasSelections).sort((a, b) => {
-            if (a.hasReachedTarget && !b.hasReachedTarget) return -1;
-            if (!a.hasReachedTarget && b.hasReachedTarget) return 1;
-            return b.filteredTotalHours - a.filteredTotalHours;
-          });
-        },
-        get unregisteredTeachers() { return this.adminTeacherMetrics.filter(t => !t.hasSelections); },
-        get vacantModules() {
-          return this.db.modules.filter(m => {
-            if (this.db.assignments.some(a => a.moduleId === m.id)) return false;
-            return (this.adminFilters.shift === 'All' || m.shift === this.adminFilters.shift) &&
-                   (this.adminFilters.semester === 'All' || m.semester === this.adminFilters.semester) &&
-                   (this.adminFilters.year === 'All' || m.year === this.adminFilters.year);
-          });
-        },
-
-        clearAllTeacherPackages(teacherName) { 
-          const confirmTxt = this.currentLang === 'ku' ? `ئایا دڵنیایت لە سڕینەوەی تەواوی تۆمارەکانی مامۆستا ${teacherName}؟` : `Are you absolutely sure you want to completely wipe all registered selections for ${teacherName}?`;
-          if (!confirm(confirmTxt)) return;
-          google.script.run.withSuccessHandler((res) => {
-            if(res.success) { this.addToast(this.currentLang === 'ku' ? "تۆمارەکان بە سەرکەوتوویی سڕدرانەوە" : "Registrations completely cleared.", "success"); this.refreshData(); }
-            else { this.addToast(res.message, "error"); }
-          }).clearTeacherAssignments(teacherName); 
-        },
-
-        deleteItem(moduleId) { 
-          const confirmTxt = this.currentLang === 'ku' ? "ئایا دڵنیایت لە لادانی ئەم مۆدیۆلە؟" : "Are you sure you want to disassociate and remove this module allocation?";
-          if (!confirm(confirmTxt)) return;
-          google.script.run.withSuccessHandler((res) => {
-            if(res.success) { this.addToast(this.currentLang === 'ku' ? "مۆدیۆلەکە لادرا" : "Module allocation deleted.", "success"); this.refreshData(); }
-            else { this.addToast(res.message, "error"); }
-          }).deleteSingleAssignment(moduleId); 
-        },
-
-        sendTeacherCredentials(teacherObj) {
-          if (!teacherObj.email) {
-            this.addToast(this.currentLang === 'ku' ? "ئەم مامۆستایە ئیمەیڵی بۆ تۆمار نەکراوە!" : "No email address found for this teacher.", "error");
-            return;
-          }
-          this.addToast(this.currentLang === 'ku' ? "کۆدەکە دەنێردرێت..." : "Sending credentials email...", "info");
-          google.script.run.withSuccessHandler((res) => {
-            if (res.success) this.addToast(this.currentLang === 'ku' ? `بە سەرکەوتوویی ناردرا بۆ ${teacherObj.name}` : `Credentials sent to ${teacherObj.name}!`, "success");
-            else this.addToast(res.message, "error");
-          }).sendTeacherCredentialsEmail(teacherObj.name, teacherObj.email, teacherObj.code);
         },
 
         downloadAsPDF() {
